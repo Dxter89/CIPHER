@@ -10,6 +10,13 @@ grow into a fuller personal assistant over time.
 
 - 🧠 **Skill-based core** — every command is a small, registrable skill, so new
   capabilities are easy to add.
+- 🤖 **Agent coordination** — register your AI agents and track/update their
+  live status (`idle`, `running`, `blocked`, `error`, `done`).
+- 📋 **Project management** — track projects, their status and progress, and
+  which agents are assigned to each.
+- 🛰️ **Status briefing** — one `status` command gives you a Jarvis-style
+  overview of every agent and project.
+- 💾 **Persistent** — state is saved to disk, so CIPHER remembers across runs.
 - 💬 **Two ways to run** — an interactive REPL, or one-shot commands from the shell.
 - ✅ **Tested** — covered by `pytest`, linted with `ruff`.
 
@@ -64,6 +71,47 @@ python -m cipher echo "hello world"
 | `time`  | Current time                      |
 | `date`  | Current date                      |
 | `echo`  | Repeat back the given text        |
+| `status`| Full briefing on agents & projects|
+
+### Coordinating agents & projects
+
+CIPHER's main job is to keep tabs on your AI agents and projects:
+
+```bash
+# Register agents and update their status
+cipher agent add scout research
+cipher agent status scout running "indexing my notes"
+
+# Track a project and its progress
+cipher project add CIPHER "jarvis-style assistant"
+cipher project progress CIPHER 40
+
+# Put agents to work on a project
+cipher assign scout to CIPHER
+
+# Get the full briefing
+cipher status
+# Agents:
+#   • scout (research): running — indexing my notes
+# Projects:
+#   • CIPHER: planning (40%) [scout]
+```
+
+| Command | Description |
+| ------- | ----------- |
+| `agent add <name> [role]`            | Register an AI agent |
+| `agent list`                         | List agents |
+| `agent status <name> <state> [note]` | Update an agent's status |
+| `agent rm <name>`                    | Remove an agent |
+| `project add <name> [description]`   | Track a project |
+| `project list`                       | List projects |
+| `project status <name> <state>`      | Update a project's status |
+| `project progress <name> <0-100>`    | Set project progress (100 marks it done) |
+| `project rm <name>`                  | Stop tracking a project |
+| `assign <agent> to <project>`        | Assign an agent to a project |
+
+State is stored at `~/.cipher/state.json` by default (override with the
+`CIPHER_STATE` environment variable).
 
 ## Extending CIPHER
 
