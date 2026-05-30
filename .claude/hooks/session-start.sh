@@ -11,5 +11,4 @@ fi
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
 # Editable install with dev dependencies (pytest, ruff). Idempotent.
-python -m pip install --upgrade pip >/dev/null
 python -m pip install -e ".[dev]"
