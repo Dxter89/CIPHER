@@ -14,6 +14,8 @@ from collections.abc import Callable
 from datetime import datetime
 
 from cipher.manager import Manager, ManagerError
+from cipher.persona import Persona
+from cipher.robot import HttpRobot, MockRobot, RobotError, connect
 
 # A skill takes the remaining argument string and returns a response.
 Skill = Callable[[str], str]
@@ -22,9 +24,19 @@ Skill = Callable[[str], str]
 class Assistant:
     """A minimal, extensible command-routing assistant."""
 
-    def __init__(self, name: str = "CIPHER", manager: Manager | None = None) -> None:
+    def __init__(
+        self,
+        name: str = "CIPHER",
+        manager: Manager | None = None,
+        persona: Persona | None = None,
+        persona_path=None,
+        robot: HttpRobot | MockRobot | None = None,
+    ) -> None:
         self.name = name
         self.manager = manager if manager is not None else Manager()
+        self._persona_path = persona_path
+        self.persona = persona if persona is not None else Persona.load(persona_path)
+        self.robot = robot if robot is not None else connect()
         self._skills: dict[str, Skill] = {}
         self._register_builtins()
 
@@ -51,7 +63,7 @@ class Assistant:
             )
         try:
             return skill(argument.strip())
-        except ManagerError as exc:
+        except (ManagerError, RobotError, ValueError) as exc:
             return f"Sorry — {exc}"
 
     # -- built-in skills --------------------------------------------------
@@ -66,6 +78,10 @@ class Assistant:
         self.register("agent", self._agent)
         self.register("project", self._project)
         self.register("assign", self._assign)
+        # Voice / robot skills.
+        self.register("persona", self._persona)
+        self.register("ask", self._ask)
+        self.register("say", self._say)
 
     def _help(self, _: str) -> str:
         return (
@@ -81,7 +97,11 @@ class Assistant:
             "  project status <name> <state>\n"
             "  project progress <name> <0-100>\n"
             "  project rm <name>\n"
-            "  assign <agent> to <project>"
+            "  assign <agent> to <project>\n"
+            "  persona                        — show CIPHER's persona\n"
+            "  persona set <field> <value>    — change role/style/etc.\n"
+            "  ask <message>                  — talk to the robot's LLM\n"
+            "  say <text>                     — make the robot speak verbatim"
         )
 
     # -- agent command ----------------------------------------------------
@@ -168,3 +188,46 @@ class Assistant:
         agent_name, project_name = tokens
         p = self.manager.assign(agent_name, project_name)
         return f"Assigned '{agent_name}' to project '{p.name}'. Crew: {', '.join(p.agents)}."
+
+    # -- persona command --------------------------------------------------
+    def _persona(self, arg: str) -> str:
+        sub, _, rest = arg.partition(" ")
+        sub, rest = sub.lower(), rest.strip()
+
+        if sub in ("", "show"):
+            p = self.persona
+            return (
+                f"Persona '{p.name}':\n"
+                f"  role:       {p.role}\n"
+                f"  style:      {p.style}\n"
+                f"  address:    {p.address or '(neutral)'}\n"
+                f"  language:   {p.language}\n"
+                f"  voice_rate: {p.voice_rate}\n"
+                f"  wake_word:  {p.wake_word}\n"
+                f"System prompt sent to the robot:\n  {self.persona.system_prompt()}"
+            )
+        if sub == "set":
+            field, _, value = rest.partition(" ")
+            if not field or not value.strip():
+                return (
+                    "Usage: persona set <field> <value>\n"
+                    f"Fields: {', '.join(Persona.field_names())}"
+                )
+            self.persona.set(field.lower(), value.strip())
+            self.persona.save(self._persona_path)
+            return f"Persona updated: {field.lower()} = {value.strip()}"
+        return f"Unknown persona command '{sub}'. Try: show, set."
+
+    # -- ask / say (robot voice) ------------------------------------------
+    def _ask(self, arg: str) -> str:
+        if not arg:
+            return "Usage: ask <message>"
+        return self.robot.ask(arg, self.persona.system_prompt())
+
+    def _say(self, arg: str) -> str:
+        if not arg:
+            return "Usage: say <text>"
+        self.robot.say(arg)
+        if not getattr(self.robot, "configured", False):
+            return "(No robot connected — set CIPHER_ROBOT_URL to make it speak.)"
+        return f"Speaking: {arg}"

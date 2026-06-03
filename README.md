@@ -16,6 +16,9 @@ grow into a fuller personal assistant over time.
   which agents are assigned to each.
 - 🛰️ **Status briefing** — one `status` command gives you a Jarvis-style
   overview of every agent and project.
+- 🗣️ **Talking robot** — connect a voice robot with an onboard LLM (e.g.
+  DeepSeek) over its local HTTP API; configure CIPHER's **persona** (role,
+  tone, how it addresses you) and it speaks back in character.
 - 💾 **Persistent** — state is saved to disk, so CIPHER remembers across runs.
 - 💬 **Two ways to run** — an interactive REPL, or one-shot commands from the shell.
 - ✅ **Tested** — covered by `pytest`, linted with `ruff`.
@@ -112,6 +115,51 @@ cipher status
 
 State is stored at `~/.cipher/state.json` by default (override with the
 `CIPHER_STATE` environment variable).
+
+### Talking to a robot device
+
+CIPHER can drive a voice robot that has its **own onboard LLM** (e.g. DeepSeek)
+and exposes a local HTTP API over Wi-Fi / Tailscale. You configure a **persona**
+— the role and the way it should respond — and CIPHER sends that, plus your
+message, to the robot, which replies (and can speak) in character.
+
+**1. Point CIPHER at your robot** (see `.env.example` for all options):
+
+```bash
+export CIPHER_ROBOT_URL=http://100.64.0.5:8080   # your robot's address (a Tailscale IP is ideal)
+export CIPHER_ROBOT_TOKEN=...                     # only if your device requires auth
+```
+
+> No training required — the robot's existing model is steered with a **persona
+> (system prompt)**, not fine-tuning. The field names/paths are configurable, so
+> CIPHER can target different devices without code changes.
+
+**2. Configure the role & how it responds:**
+
+```bash
+cipher persona                              # show the current persona + system prompt
+cipher persona set role "a calm assistant like Jarvis"
+cipher persona set style "concise and lightly witty"
+cipher persona set address sir              # how it addresses you
+cipher persona set voice_rate 175           # speaking-speed hint
+```
+
+**3. Talk to it:**
+
+```bash
+cipher ask "how are my projects going?"     # routed to the robot's LLM, in persona
+cipher say "Good morning"                   # speak this text verbatim
+```
+
+If no `CIPHER_ROBOT_URL` is set, CIPHER runs in **offline mode** — commands
+still work and clearly tell you the robot isn't connected.
+
+| Command | Description |
+| ------- | ----------- |
+| `persona`                    | Show CIPHER's persona and its system prompt |
+| `persona set <field> <value>`| Configure role / style / address / language / voice_rate / wake_word |
+| `ask <message>`              | Send a message to the robot's LLM (in persona) and get its reply |
+| `say <text>`                 | Make the robot speak the text verbatim |
 
 ## Extending CIPHER
 
