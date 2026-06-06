@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+from cipher.desktop import DesktopError, open_app, show_desktop
 from cipher.manager import Manager, ManagerError
 from cipher.persona import Persona
 from cipher.robot import HttpRobot, MockRobot, RobotError, connect
@@ -63,7 +64,7 @@ class Assistant:
             )
         try:
             return skill(argument.strip())
-        except (ManagerError, RobotError, ValueError) as exc:
+        except (ManagerError, RobotError, DesktopError, ValueError) as exc:
             return f"Sorry — {exc}"
 
     # -- built-in skills --------------------------------------------------
@@ -82,6 +83,8 @@ class Assistant:
         self.register("persona", self._persona)
         self.register("ask", self._ask)
         self.register("say", self._say)
+        # Desktop skills.
+        self.register("desktop", self._desktop)
 
     def _help(self, _: str) -> str:
         return (
@@ -101,7 +104,9 @@ class Assistant:
             "  persona                        — show CIPHER's persona\n"
             "  persona set <field> <value>    — change role/style/etc.\n"
             "  ask <message>                  — talk to the robot's LLM\n"
-            "  say <text>                     — make the robot speak verbatim"
+            "  say <text>                     — make the robot speak verbatim\n"
+            "  desktop                        — show the desktop (minimise all windows)\n"
+            "  desktop launch <app>           — open an application by name"
         )
 
     # -- agent command ----------------------------------------------------
@@ -231,3 +236,18 @@ class Assistant:
         if not getattr(self.robot, "configured", False):
             return "(No robot connected — set CIPHER_ROBOT_URL to make it speak.)"
         return f"Speaking: {arg}"
+
+    # -- desktop skills ---------------------------------------------------
+    def _desktop(self, arg: str) -> str:
+        sub, _, rest = arg.partition(" ")
+        sub = sub.lower()
+
+        if sub in ("", "show", "open"):
+            return show_desktop()
+        if sub in ("launch", "start", "run"):
+            if not rest:
+                return "Usage: desktop launch <app>"
+            return open_app(rest.strip())
+        # Treat any unrecognised sub-command as an app name to open, so that
+        # "desktop firefox" works as well as "desktop launch firefox".
+        return open_app(arg.strip())
